@@ -1,5 +1,5 @@
 use spacetimedb::{
-    procedure, reducer, table, view, AnonymousViewContext, ProcedureContext, ReducerContext, Table, SpacetimeType,
+    procedure, reducer, table, view, AnonymousViewContext, Identity, ProcedureContext, ReducerContext, Table, SpacetimeType,
 };
 
 /// Status enum for testing sum types
@@ -162,4 +162,57 @@ pub fn init(ctx: &ReducerContext) {
         timestamp: 0,
         status: NoteStatus::Published { published_at: 1234567890 },
     });
+}
+
+// ── Chat tables and reducers (for flutter example) ──────────────
+
+#[table(name = user, public)]
+pub struct User {
+    #[primary_key]
+    pub identity: Identity,
+    pub name: String,
+    pub online: bool,
+}
+
+#[table(name = message, public)]
+pub struct Message {
+    pub sender: Identity,
+    pub sent: u64,
+    pub text: String,
+}
+
+#[reducer]
+pub fn set_name(ctx: &ReducerContext, name: String) {
+    if let Some(user) = ctx.db.user().identity().find(ctx.sender) {
+        ctx.db.user().identity().update(User { name, ..user });
+    }
+}
+
+#[reducer]
+pub fn send_message(ctx: &ReducerContext, text: String) {
+    ctx.db.message().insert(Message {
+        sender: ctx.sender,
+        text,
+        sent: ctx.timestamp.to_micros_since_unix_epoch() as u64,
+    });
+}
+
+#[reducer(client_connected)]
+pub fn client_connected(ctx: &ReducerContext) {
+    if let Some(user) = ctx.db.user().identity().find(ctx.sender) {
+        ctx.db.user().identity().update(User { online: true, ..user });
+    } else {
+        ctx.db.user().insert(User {
+            name: String::new(),
+            identity: ctx.sender,
+            online: true,
+        });
+    }
+}
+
+#[reducer(client_disconnected)]
+pub fn client_disconnected(ctx: &ReducerContext) {
+    if let Some(user) = ctx.db.user().identity().find(ctx.sender) {
+        ctx.db.user().identity().update(User { online: false, ..user });
+    }
 }
