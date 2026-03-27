@@ -245,6 +245,10 @@ client.onMutationSyncResult.listen((r) => r.success ? null : showError(r.error))
 
 Offline behavior: cached data loads instantly, mutations queue locally, optimistic changes update UI, queued mutations replay on reconnect, failed mutations roll back.
 
+## Examples
+
+See [`example/flutter_notes/`](example/flutter_notes/) for a minimal Flutter app (mobile + web) demonstrating real-time CRUD, subscriptions, connection status UI, and sealed class pattern matching.
+
 ## Testing
 
 ```bash

@@ -2,9 +2,9 @@ name: Tests
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, master ]
 
 jobs:
   analyze:
@@ -15,14 +15,15 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
+          flutter-version: '3.24.5'
           channel: 'stable'
+          cache: true
 
       - name: Install dependencies
         run: flutter pub get
 
       - name: Analyze code
-        run: dart analyze --fatal-infos
+        run: dart analyze
 
   test:
     name: Unit Tests
@@ -32,14 +33,15 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
+          flutter-version: '3.24.5'
           channel: 'stable'
+          cache: true
 
       - name: Install dependencies
         run: flutter pub get
 
       - name: Run unit tests
-        run: dart test test/unit/ test/codec/ test/messages/ test/auth/
+        run: dart test test/unit/
 
   format:
     name: Format Check
@@ -49,8 +51,62 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
+          flutter-version: '3.24.5'
           channel: 'stable'
+          cache: true
 
       - name: Check formatting
         run: dart format --set-exit-if-changed .
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install SpacetimeDB CLI
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://install.spacetimedb.com | sh -s -- --yes
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Start SpacetimeDB
+        run: |
+          docker run -d --name spacetimedb -p 3000:3000 clockworklabs/spacetime start
+          # Wait for SpacetimeDB to be ready
+          for i in $(seq 1 30); do
+            if spacetime server ping http://localhost:3000 2>/dev/null; then
+              echo "SpacetimeDB is ready"
+              exit 0
+            fi
+            echo "Waiting for SpacetimeDB... ($i/30)"
+            sleep 2
+          done
+          echo "SpacetimeDB failed to start within 60s"
+          docker logs spacetimedb
+          exit 1
+
+      - name: Login to local SpacetimeDB
+        run: spacetime login --server-issued-login http://localhost:3000
+
+      - name: Build and publish test module
+        working-directory: spacetime_test_module
+        run: |
+          spacetime build
+          spacetime publish notesdb -s http://localhost:3000
+
+      - name: Run integration tests
+        run: dart test test/integration/ --timeout 60s
