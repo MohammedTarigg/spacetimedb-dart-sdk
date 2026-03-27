@@ -1,0 +1,20 @@
+name: flutter_notes
+description: Minimal Flutter example using the SpacetimeDB Dart SDK — a real-time notes app with CRUD, status filtering, and live sync.
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.5.4
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  spacetimedb_dart_sdk:
+    path: ../..
+
+flutter:
+  uses-material-design: true
+
+dev_dependencies:
+  flutter_lints: ^4.0.0
